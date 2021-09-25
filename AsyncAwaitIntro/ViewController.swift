@@ -75,24 +75,68 @@ func downloadImageAndMetadata(
     imageNumber: Int,
     completionHandler: @escaping (_ image: DetailedImage?, _ error: Error?) -> Void
 ) {
-    let imageUrl = URL(string: "https://www.andyibanez.com/fairesepages.github.io/tutorials/async-await/part1/\(imageNumber).png")!
-    let imageTask = URLSession.shared.dataTask(with: imageUrl) { data, response, error in
-        guard let data = data, let image = UIImage(data: data), (response as? HTTPURLResponse)?.statusCode == 200 else {
-            completionHandler(nil, ImageDownloadError.badImage)
-            return
-        }
-        let metadataUrl = URL(string: "https://www.andyibanez.com/fairesepages.github.io/tutorials/async-await/part1/\(imageNumber).json")!
-        let metadataTask = URLSession.shared.dataTask(with: metadataUrl) { data, response, error in
-            guard let data = data, let metadata = try? JSONDecoder().decode(ImageMetadata.self, from: data),  (response as? HTTPURLResponse)?.statusCode == 200 else {
-                completionHandler(nil, ImageDownloadError.invalidMetadata)
-                return
+    let imageUrl = "https://www.andyibanez.com/fairesepages.github.io/tutorials/async-await/part1/\(imageNumber).png"
+    let metadataUrl="https://www.andyibanez.com/fairesepages.github.io/tutorials/async-await/part1/\(imageNumber).json"
+    
+    let requestImage = NSURLRequest(url: NSURL(string: imageUrl)! as URL)
+    let requestData = NSURLRequest(url: NSURL(string: metadataUrl)! as URL)
+    
+    let sessionImage=URLSession.shared
+    let sessionData=URLSession.shared
+    var imageSec:UIImage?
+    
+    
+    DispatchQueue.global(qos: .userInitiated).sync {
+        let taskImage = sessionImage.dataTask(with: requestImage as URLRequest,
+                                       completionHandler: { data, response, error -> Void in
+            guard let data = data, let image = UIImage(data: data), (response as? HTTPURLResponse)?.statusCode == 200 else {
+                        completionHandler(nil, ImageDownloadError.badImage)
+                        return
+                    }
+            DispatchQueue.main.sync {
+                imageSec=image
             }
-            let detailedImage = DetailedImage(image: image, metadata: metadata)
-            completionHandler(detailedImage, nil)
-        }
-        metadataTask.resume()
+            DispatchQueue.global(qos: .userInitiated).sync {
+                let taskData = sessionData.dataTask(with: requestData as URLRequest,
+                                               completionHandler: { data, response, error -> Void in
+                    guard let data = data, let metadata = try? JSONDecoder().decode(ImageMetadata.self, from: data),  (response as? HTTPURLResponse)?.statusCode == 200
+                    
+                    else {
+                                    completionHandler(nil, ImageDownloadError.invalidMetadata)
+                                    return
+                                }
+                    DispatchQueue.main.sync {
+                        
+                        let detailedImage = DetailedImage(image: imageSec!, metadata: metadata)
+                        completionHandler(detailedImage, nil)
+                    }
+                    
+                    
+                   })
+                taskData.resume()
+            }
+            
+        })
+        taskImage.resume()
     }
-    imageTask.resume()
+//    let imageUrl = URL(string: "https://www.andyibanez.com/fairesepages.github.io/tutorials/async-await/part1/\(imageNumber).png")!
+//    let imageTask = URLSession.shared.dataTask(with: imageUrl) { data, response, error in
+//        guard let data = data, let image = UIImage(data: data), (response as? HTTPURLResponse)?.statusCode == 200 else {
+//            completionHandler(nil, ImageDownloadError.badImage)
+//            return
+//        }
+//        let metadataUrl = URL(string: "https://www.andyibanez.com/fairesepages.github.io/tutorials/async-await/part1/\(imageNumber).json")!
+//        let metadataTask = URLSession.shared.dataTask(with: metadataUrl) { data, response, error in
+//            guard let data = data, let metadata = try? JSONDecoder().decode(ImageMetadata.self, from: data),  (response as? HTTPURLResponse)?.statusCode == 200 else {
+//                completionHandler(nil, ImageDownloadError.invalidMetadata)
+//                return
+//            }
+//            let detailedImage = DetailedImage(image: image, metadata: metadata)
+//            completionHandler(detailedImage, nil)
+//        }
+//        metadataTask.resume()
+//    }
+//    imageTask.resume()
 }
 
 // MARK: - Main class
@@ -113,12 +157,12 @@ class ViewController: UIViewController {
         
         // MARK: METHOD 1 - Using Async/Await
         
-        Task {
-            if let imageDetail = try? await downloadImageAndMetadata(imageNumber: 1) {
-                self.imageView.image = imageDetail.image
-                self.metadata.text = "\(imageDetail.metadata.name) (\(imageDetail.metadata.firstAppearance) - \(imageDetail.metadata.year))"
-            }
-        }
+//        Task {
+//            if let imageDetail = try? await downloadImageAndMetadata(imageNumber: 1) {
+//                self.imageView.image = imageDetail.image
+//                self.metadata.text = "\(imageDetail.metadata.name) (\(imageDetail.metadata.firstAppearance) - \(imageDetail.metadata.year))"
+//            }
+//        }
         
         // MARK: METHOD 2 - Using async properties
         
@@ -134,14 +178,14 @@ class ViewController: UIViewController {
         
         // MARK: Method 3 - Using Callbacks
         
-//        downloadImageAndMetadata(imageNumber: 1) { imageDetail, error in
-//            DispatchQueue.main.async {
-//                if let imageDetail = imageDetail {
-//                    self.imageView.image = imageDetail.image
-//                    self.metadata.text =  "\(imageDetail.metadata.name) (\(imageDetail.metadata.firstAppearance) - \(imageDetail.metadata.year))"
-//                }
-//            }
-//        }
+        downloadImageAndMetadata(imageNumber: 1) { imageDetail, error in
+            DispatchQueue.main.async {
+                if let imageDetail = imageDetail {
+                    self.imageView.image = imageDetail.image
+                    self.metadata.text =  "\(imageDetail.metadata.name) (\(imageDetail.metadata.firstAppearance) - \(imageDetail.metadata.year))"
+                }
+            }
+        }
     }
     
 }
